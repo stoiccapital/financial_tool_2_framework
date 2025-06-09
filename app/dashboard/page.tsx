@@ -146,7 +146,7 @@ export default function Dashboard() {
         const avgIncome = totalIncome / totalMonths
         const avgExpense = totalExpense / totalMonths
         const avgSavings = totalSavings / totalMonths
-        const avgSavingsRate = ((totalSavings + currentBalance) / totalIncome) * 100
+        const avgSavingsRate = (avgSavings / avgIncome) * 100
 
         setMetrics({
           avgSavings,
