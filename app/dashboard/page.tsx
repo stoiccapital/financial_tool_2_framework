@@ -2,6 +2,16 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts'
 
 interface AggregatedTransaction {
   year: number
@@ -19,6 +29,12 @@ interface Projection {
   totalExpense: number
 }
 
+interface YearlyProjection {
+  year: number
+  cumulativeSavings: number
+  totalAssets: number
+}
+
 const STORAGE_KEY = 'incomeExpenseTransactions'
 
 export default function Dashboard() {
@@ -31,6 +47,8 @@ export default function Dashboard() {
   })
   const [projections, setProjections] = useState<Projection[]>([])
   const [hasData, setHasData] = useState(false)
+  const [roi, setRoi] = useState(10)
+  const [yearlyProjections, setYearlyProjections] = useState<YearlyProjection[]>([])
 
   useEffect(() => {
     setIsClient(true)
@@ -118,6 +136,28 @@ export default function Dashboard() {
     calculateMetrics()
   }, [])
 
+  // Calculate yearly projections whenever ROI or metrics change
+  useEffect(() => {
+    if (!hasData) return
+
+    const yearlyData: YearlyProjection[] = []
+    let totalAssets = 0
+    const yearlySavings = metrics.avgSavings * 12
+
+    for (let year = 1; year <= 30; year++) {
+      const cumulativeSavings = yearlySavings * year
+      totalAssets = (totalAssets * (1 + roi / 100)) + yearlySavings
+
+      yearlyData.push({
+        year,
+        cumulativeSavings,
+        totalAssets
+      })
+    }
+
+    setYearlyProjections(yearlyData)
+  }, [roi, metrics.avgSavings, hasData])
+
   if (!isClient) {
     return null
   }
@@ -195,6 +235,83 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* ROI Input and Chart */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-700 mb-4">30-Year Projection</h2>
+              <div className="flex items-center space-x-4">
+                <label htmlFor="roi" className="text-sm font-medium text-gray-700">
+                  Expected Yearly Return (ROI):
+                </label>
+                <input
+                  type="number"
+                  id="roi"
+                  value={roi}
+                  onChange={(e) => setRoi(Number(e.target.value))}
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                />
+                <span className="text-sm text-gray-500">%</span>
+              </div>
+            </div>
+
+            <div className="h-[400px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={yearlyProjections}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="year"
+                    label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+                  />
+                  <YAxis
+                    tickFormatter={(value) => {
+                      if (value >= 1e9) {
+                        return `$${(value / 1e9).toFixed(1)}B`
+                      }
+                      if (value >= 1e6) {
+                        return `$${(value / 1e6).toFixed(1)}M`
+                      }
+                      if (value >= 1e3) {
+                        return `$${(value / 1e3).toFixed(1)}K`
+                      }
+                      return `$${value.toFixed(0)}`
+                    }}
+                    label={{ value: 'Amount ($)', angle: -90, position: 'insideLeft' }}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [
+                      `$${value.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}`,
+                      ''
+                    ]}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="cumulativeSavings"
+                    name="Cumulative Savings"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="totalAssets"
+                    name="Total Assets"
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
           {/* Projections Table */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -260,7 +377,7 @@ export default function Dashboard() {
                   {/* Total Expense Row */}
                   <tr className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      Projected Total Expense
+                      Projected Total Expenses
                     </td>
                     {projections.map((projection) => (
                       <td
