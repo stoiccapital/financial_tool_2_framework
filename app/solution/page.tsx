@@ -18,6 +18,12 @@ interface AggregatedTransaction {
   amount: number
 }
 
+interface CurrentBalance {
+  year: number
+  month: string
+  amount: number
+}
+
 const months = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -27,7 +33,8 @@ const months = [
 const STORAGE_KEYS = {
   TRANSACTIONS: 'incomeExpenseTransactions',
   LAST_YEAR: 'incomeExpenseLastYear',
-  LAST_MONTH: 'incomeExpenseLastMonth'
+  LAST_MONTH: 'incomeExpenseLastMonth',
+  CURRENT_BALANCE: 'incomeExpenseCurrentBalance'
 }
 
 // Helper function to safely parse JSON
@@ -75,12 +82,17 @@ export default function IncomeExpenseTracker() {
   const [isClient, setIsClient] = useState(false)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [showBalanceForm, setShowBalanceForm] = useState(false)
   const [lastUsedYear, setLastUsedYear] = useState(new Date().getFullYear())
   const [lastUsedMonth, setLastUsedMonth] = useState(months[new Date().getMonth()])
+  const [currentBalance, setCurrentBalance] = useState<CurrentBalance | null>(null)
   const [formData, setFormData] = useState({
     year: lastUsedYear,
     month: lastUsedMonth,
     type: 'Income' as 'Income' | 'Expense',
+    amount: ''
+  })
+  const [balanceFormData, setBalanceFormData] = useState({
     amount: ''
   })
 
@@ -109,6 +121,15 @@ export default function IncomeExpenseTracker() {
       setLastUsedMonth(savedMonth)
       setFormData(prev => ({ ...prev, month: savedMonth }))
     }
+
+    const savedBalance = localStorage.getItem(STORAGE_KEYS.CURRENT_BALANCE)
+    if (savedBalance) {
+      try {
+        setCurrentBalance(JSON.parse(savedBalance))
+      } catch (error) {
+        console.error('Error loading current balance:', error)
+      }
+    }
   }, [])
 
   // Save transactions to localStorage whenever they change
@@ -126,11 +147,26 @@ export default function IncomeExpenseTracker() {
     }
   }, [lastUsedYear, lastUsedMonth, isClient])
 
+  // Save current balance to localStorage whenever it changes
+  useEffect(() => {
+    if (isClient && currentBalance) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_BALANCE, JSON.stringify(currentBalance))
+    }
+  }, [currentBalance, isClient])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }))
+  }
+
+  const handleBalanceInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target
+    setBalanceFormData(prev => ({
+      ...prev,
+      amount: value
     }))
   }
 
@@ -153,6 +189,20 @@ export default function IncomeExpenseTracker() {
       amount: ''
     }))
     setShowForm(false)
+  }
+
+  const handleBalanceSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    const newBalance: CurrentBalance = {
+      year: new Date().getFullYear(),
+      month: months[new Date().getMonth()],
+      amount: parseFloat(balanceFormData.amount)
+    }
+
+    setCurrentBalance(newBalance)
+    setBalanceFormData({ amount: '' })
+    setShowBalanceForm(false)
   }
 
   const handleClearData = () => {
@@ -189,6 +239,11 @@ export default function IncomeExpenseTracker() {
     setShowForm(true)
   }
 
+  const openBalanceForm = () => {
+    setBalanceFormData({ amount: '' })
+    setShowBalanceForm(true)
+  }
+
   // Don't render anything until we're on the client side
   if (!isClient) {
     return null
@@ -200,13 +255,34 @@ export default function IncomeExpenseTracker() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Income & Expense Tracker</h1>
 
+      {/* Current Balance Display */}
+      {currentBalance && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">
+            Current Balance for {currentBalance.month} {currentBalance.year}
+          </h2>
+          <p className="text-3xl font-bold text-primary">
+            €{currentBalance.amount.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}
+          </p>
+        </div>
+      )}
+
       {/* Action Buttons */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <button
           onClick={openForm}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           Add new Transaction
+        </button>
+        <button
+          onClick={openBalanceForm}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          Add Current Balance
         </button>
         <button
           onClick={handleClearData}
@@ -248,7 +324,6 @@ export default function IncomeExpenseTracker() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
               <div>
                 <label htmlFor="month" className="block text-sm font-medium text-gray-700 mb-1">
                   Month
@@ -262,11 +337,12 @@ export default function IncomeExpenseTracker() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {months.map(month => (
-                    <option key={month} value={month}>{month}</option>
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
                   ))}
                 </select>
               </div>
-
               <div>
                 <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
                   Type
@@ -283,7 +359,6 @@ export default function IncomeExpenseTracker() {
                   <option value="Expense">Expense</option>
                 </select>
               </div>
-
               <div>
                 <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
                   Amount
@@ -295,23 +370,22 @@ export default function IncomeExpenseTracker() {
                   value={formData.amount}
                   onChange={handleInputChange}
                   required
-                  step="0.01"
                   min="0"
+                  step="0.01"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-4">
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
                   Add Transaction
                 </button>
@@ -321,54 +395,114 @@ export default function IncomeExpenseTracker() {
         </div>
       )}
 
-      {/* Transactions Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Income</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expense</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {aggregatedTransactions.map(transaction => (
-              <tr key={`${transaction.year}-${transaction.month}`} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{transaction.year}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{transaction.month}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${transaction.income.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${transaction.expense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm ${
-                  transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  ${transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <button
-                    onClick={() => handleDeleteMonth(transaction.year, transaction.month)}
-                    className="text-red-600 hover:text-red-900 focus:outline-none focus:underline"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {aggregatedTransactions.length === 0 && (
+      {/* Current Balance Form */}
+      {showBalanceForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4">Add Current Balance</h2>
+            <form onSubmit={handleBalanceSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="balance-amount" className="block text-sm font-medium text-gray-700 mb-1">
+                  Current Balance
+                </label>
+                <input
+                  type="number"
+                  id="balance-amount"
+                  name="amount"
+                  value={balanceFormData.amount}
+                  onChange={handleBalanceInputChange}
+                  required
+                  min="0"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter your current balance"
+                />
+              </div>
+              <div className="flex justify-end space-x-4">
+                <button
+                  type="button"
+                  onClick={() => setShowBalanceForm(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                >
+                  Save Balance
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Results Table */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-700">Transaction History</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                  No transactions yet. Click "Add new Transaction" to get started.
-                </td>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Period
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Income
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Expense
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Net Amount
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {aggregatedTransactions.map((transaction) => (
+                <tr key={`${transaction.year}-${transaction.month}`} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {transaction.month} {transaction.year}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                    €{transaction.income.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                    €{transaction.expense.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                    transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    €{transaction.amount.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => handleDeleteMonth(transaction.year, transaction.month)}
+                      className="text-red-600 hover:text-red-900 focus:outline-none focus:underline"
+                    >
+                      Delete Month
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
