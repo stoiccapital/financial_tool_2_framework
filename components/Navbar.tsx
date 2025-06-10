@@ -39,7 +39,6 @@ export default function Navbar() {
   }, [])
 
   const navLinks = [
-    { href: '/dashboard', label: 'Dashboard' },
     { href: '/tools', label: 'Free Tools' },
     { href: '/blogs', label: 'Blogs' },
     { href: '/solution', label: 'Solution' }
