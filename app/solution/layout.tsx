@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
+import { createBrowserClient } from '@supabase/ssr'
 
 export default function SolutionLayout({
   children,
@@ -11,7 +12,41 @@ export default function SolutionLayout({
   children: React.ReactNode
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Auth check error:', error)
+          router.push('/auth/login')
+          return
+        }
+
+        if (!session) {
+          console.log('No active session found')
+          router.push('/auth/login')
+          return
+        }
+
+        console.log('Session found:', session.user.email)
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Auth check failed:', error)
+        router.push('/auth/login')
+      }
+    }
+
+    checkAuth()
+  }, [router, supabase.auth])
 
   const navItems = [
     { name: 'Dashboard', href: '/solution/dashboard' },
@@ -19,6 +54,17 @@ export default function SolutionLayout({
     { name: 'Planning Budget', href: '/solution/planning-budget' },
     { name: 'Net Worth', href: '/solution/net-worth' },
   ]
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">

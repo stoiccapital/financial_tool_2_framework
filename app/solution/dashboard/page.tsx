@@ -91,106 +91,113 @@ export default function Dashboard() {
   useEffect(() => {
     setIsClient(true)
     const calculateMetrics = () => {
-      const savedTransactions = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)
-      const savedBalance = localStorage.getItem(STORAGE_KEYS.CURRENT_BALANCE)
-      let currentBalance = 0
-
-      // Load current balance if available
-      if (savedBalance) {
-        try {
-          const balance: CurrentBalance = JSON.parse(savedBalance)
-          currentBalance = balance.amount
-        } catch (error) {
-          console.error('Error loading current balance:', error)
-        }
-      }
-
-      if (!savedTransactions) {
-        setHasData(false)
-        return
-      }
-
       try {
-        const transactions = JSON.parse(savedTransactions)
-        if (transactions.length === 0) {
+        const savedTransactions = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)
+        const savedBalance = localStorage.getItem(STORAGE_KEYS.CURRENT_BALANCE)
+        let currentBalance = 0
+
+        // Load current balance if available
+        if (savedBalance) {
+          try {
+            const balance: CurrentBalance = JSON.parse(savedBalance)
+            currentBalance = balance.amount
+          } catch (error) {
+            console.error('Error loading current balance:', error)
+          }
+        }
+
+        if (!savedTransactions) {
+          console.log('No transactions found in localStorage')
           setHasData(false)
           return
         }
 
-        // Aggregate transactions by year/month
-        const aggregated: { [key: string]: AggregatedTransaction } = {}
-        transactions.forEach((transaction: any) => {
-          const key = `${transaction.year}-${transaction.month}`
-          if (!aggregated[key]) {
-            aggregated[key] = {
-              year: transaction.year,
-              month: transaction.month,
-              income: 0,
-              expense: 0,
-              amount: 0
+        try {
+          const transactions = JSON.parse(savedTransactions)
+          if (transactions.length === 0) {
+            console.log('No transactions data available')
+            setHasData(false)
+            return
+          }
+
+          // Aggregate transactions by year/month
+          const aggregated: { [key: string]: AggregatedTransaction } = {}
+          transactions.forEach((transaction: any) => {
+            const key = `${transaction.year}-${transaction.month}`
+            if (!aggregated[key]) {
+              aggregated[key] = {
+                year: transaction.year,
+                month: transaction.month,
+                income: 0,
+                expense: 0,
+                amount: 0
+              }
             }
-          }
 
-          if (transaction.type === 'Income') {
-            aggregated[key].income += transaction.amount
-          } else {
-            aggregated[key].expense += transaction.amount
-          }
-          aggregated[key].amount = aggregated[key].income - aggregated[key].expense
-        })
+            if (transaction.type === 'Income') {
+              aggregated[key].income += transaction.amount
+            } else {
+              aggregated[key].expense += transaction.amount
+            }
+            aggregated[key].amount = aggregated[key].income - aggregated[key].expense
+          })
 
-        const monthlyData = Object.values(aggregated)
-        const totalMonths = monthlyData.length
+          const monthlyData = Object.values(aggregated)
+          const totalMonths = monthlyData.length
 
-        // Calculate metrics
-        const totalIncome = monthlyData.reduce((sum, month) => sum + month.income, 0)
-        const totalExpense = monthlyData.reduce((sum, month) => sum + month.expense, 0)
-        const totalSavings = totalIncome - totalExpense
+          // Calculate metrics
+          const totalIncome = monthlyData.reduce((sum, month) => sum + month.income, 0)
+          const totalExpense = monthlyData.reduce((sum, month) => sum + month.expense, 0)
+          const totalSavings = totalIncome - totalExpense
 
-        const avgIncome = totalIncome / totalMonths
-        const avgExpense = totalExpense / totalMonths
-        const avgSavings = totalSavings / totalMonths
-        const avgSavingsRate = (avgSavings / avgIncome) * 100
+          const avgIncome = totalIncome / totalMonths
+          const avgExpense = totalExpense / totalMonths
+          const avgSavings = totalSavings / totalMonths
+          const avgSavingsRate = (avgSavings / avgIncome) * 100
 
-        setMetrics({
-          avgSavings,
-          avgSavingsRate,
-          avgExpense,
-          avgIncome,
-          currentBalance
-        })
+          setMetrics({
+            avgSavings,
+            avgSavingsRate,
+            avgExpense,
+            avgIncome,
+            currentBalance
+          })
 
-        // Calculate projections
-        const periods = [
-          { period: '1 Year', months: 12 },
-          { period: '3 Years', months: 36 },
-          { period: '5 Years', months: 60 },
-          { period: '10 Years', months: 120 },
-          { period: '30 Years', months: 360 }
-        ]
+          // Calculate projections
+          const periods = [
+            { period: '1 Year', months: 12 },
+            { period: '3 Years', months: 36 },
+            { period: '5 Years', months: 60 },
+            { period: '10 Years', months: 120 },
+            { period: '30 Years', months: 360 }
+          ]
 
-        const newProjections = periods.map(({ period, months }) => {
-          // Calculate projected assets for this period
-          let projectedAssets = currentBalance
-          const yearlySavings = avgSavings * 12
-          const years = months / 12
+          const newProjections = periods.map(({ period, months }) => {
+            // Calculate projected assets for this period
+            let projectedAssets = currentBalance
+            const yearlySavings = avgSavings * 12
+            const years = months / 12
 
-          for (let year = 1; year <= years; year++) {
-            projectedAssets = (projectedAssets * (1 + roi / 100)) + yearlySavings
-          }
+            for (let year = 1; year <= years; year++) {
+              projectedAssets = (projectedAssets * (1 + roi / 100)) + yearlySavings
+            }
 
-          return {
-            period,
-            months,
-            totalSavings: (avgSavings * months) + currentBalance,
-            totalIncome: avgIncome * months,
-            totalExpense: avgExpense * months,
-            projectedAssets
-          }
-        })
+            return {
+              period,
+              months,
+              totalSavings: (avgSavings * months) + currentBalance,
+              totalIncome: avgIncome * months,
+              totalExpense: avgExpense * months,
+              projectedAssets
+            }
+          })
 
-        setProjections(newProjections)
-        setHasData(true)
+          setProjections(newProjections)
+          setHasData(true)
+        } catch (error) {
+          console.error('Error calculating metrics:', error)
+          setHasData(false)
+        }
       } catch (error) {
         console.error('Error calculating metrics:', error)
         setHasData(false)

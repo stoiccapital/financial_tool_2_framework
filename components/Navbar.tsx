@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/app/context/AuthContext'
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
+  const { user, signOut } = useAuth()
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -68,6 +70,25 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            
+            {user ? (
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-700">{user.email}</span>
+                <button
+                  onClick={() => signOut()}
+                  className="text-sm text-gray-700 hover:text-primary"
+                >
+                  Log out
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Log in
+              </Link>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -139,6 +160,27 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+          
+          {user ? (
+            <>
+              <div className="px-3 py-2 text-sm text-gray-700">
+                {user.email}
+              </div>
+              <button
+                onClick={() => signOut()}
+                className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-50"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary hover:bg-gray-50"
+            >
+              Log in
+            </Link>
+          )}
         </div>
       </div>
     </nav>
