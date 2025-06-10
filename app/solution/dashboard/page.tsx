@@ -12,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts'
+import { formatCurrency } from '@/app/lib/utils'
 
 interface AggregatedTransaction {
   year: number
@@ -42,6 +43,17 @@ interface CurrentBalance {
   amount: number
 }
 
+interface NetWorthEntry {
+  id: string;
+  date: string;
+  assets: any[];
+  liabilities: any[];
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+  notes?: string;
+}
+
 const STORAGE_KEYS = {
   TRANSACTIONS: 'incomeExpenseTransactions',
   CURRENT_BALANCE: 'incomeExpenseCurrentBalance'
@@ -61,28 +73,20 @@ export default function Dashboard() {
   const [roi, setRoi] = useState(10)
   const [yearlyProjections, setYearlyProjections] = useState<YearlyProjection[]>([])
 
-  // Helper to get current balance display info
-  const currentBalanceAmount = metrics.currentBalance || 0;
-  const [currentBalanceDate, setCurrentBalanceDate] = useState<string | null>(null);
+  // Net Worth Card State
+  const [netWorthEntry, setNetWorthEntry] = useState<NetWorthEntry | null>(null)
 
   useEffect(() => {
-    // Try to get the date info from localStorage
-    const savedBalance = localStorage.getItem('incomeExpenseCurrentBalance');
-    if (savedBalance) {
-      try {
-        const balance = JSON.parse(savedBalance);
-        if (balance && balance.month && balance.year) {
-          setCurrentBalanceDate(`as of ${balance.month} ${balance.year}`);
-        } else {
-          setCurrentBalanceDate(null);
-        }
-      } catch {
-        setCurrentBalanceDate(null);
+    // Load the most recent net worth entry from localStorage
+    const savedEntries = localStorage.getItem('netWorthEntries');
+    if (savedEntries) {
+      const parsedEntries = JSON.parse(savedEntries);
+      if (parsedEntries.length > 0) {
+        // Entries are sorted by date descending in the tracker
+        setNetWorthEntry(parsedEntries[0]);
       }
-    } else {
-      setCurrentBalanceDate(null);
     }
-  }, [metrics.currentBalance]);
+  }, [isClient]);
 
   useEffect(() => {
     setIsClient(true)
@@ -253,6 +257,37 @@ export default function Dashboard() {
     setProjections(newProjections)
   }, [roi, metrics, hasData])
 
+  // Helper to calculate projections based on clarified formulas
+  const getProjectionData = () => {
+    if (!netWorthEntry) return [];
+    const annualSavings = metrics.avgSavings * 12;
+    const roiDecimal = roi / 100;
+    const periods = [
+      { period: '1 Year', years: 1 },
+      { period: '3 Years', years: 3 },
+      { period: '5 Years', years: 5 },
+      { period: '10 Years', years: 10 },
+      { period: '30 Years', years: 30 },
+    ];
+    return periods.map(({ period, years }) => {
+      // Projected Savings (linear, no compounding)
+      const projectedSavings = netWorthEntry.netWorth + annualSavings * years;
+      // Projected Net Worth (compounding)
+      let projectedNetWorth = netWorthEntry.netWorth;
+      for (let y = 0; y < years; y++) {
+        projectedNetWorth = (projectedNetWorth + annualSavings) * (1 + roiDecimal);
+      }
+      return {
+        period,
+        years,
+        projectedSavings,
+        projectedNetWorth,
+      };
+    });
+  };
+
+  const projectionData = getProjectionData();
+
   if (!isClient) {
     return null
   }
@@ -261,16 +296,25 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Financial Dashboard</h1>
 
-      {/* Current Balance Card */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-md p-6 mb-8 flex flex-col items-start sm:items-center sm:flex-row sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-blue-800 mb-1">Current Balance</h2>
-          <p className="text-3xl font-bold text-blue-600">
-            €{currentBalanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          {currentBalanceDate && (
-            <p className="text-sm text-blue-500 mt-1">{currentBalanceDate}</p>
-          )}
+      {/* Total Net Worth Card (replaces Current Balance) */}
+      <div
+        className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-6 mb-8 text-white cursor-pointer hover:shadow-xl transition-shadow"
+        onClick={() => window.location.href = '/solution/net-worth'}
+        title="Go to Net Worth Tracker"
+      >
+        <h2 className="text-2xl font-semibold mb-2">Total Net Worth</h2>
+        <div className="text-4xl font-bold mb-2">
+          {netWorthEntry ? formatCurrency(netWorthEntry.netWorth) : '$0.00'}
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+          <div>
+            <p className="text-blue-200">Total Assets</p>
+            <p className="text-xl font-semibold">{netWorthEntry ? formatCurrency(netWorthEntry.totalAssets) : '$0.00'}</p>
+          </div>
+          <div>
+            <p className="text-blue-200">Total Liabilities</p>
+            <p className="text-xl font-semibold">{netWorthEntry ? formatCurrency(netWorthEntry.totalLiabilities) : '$0.00'}</p>
+          </div>
         </div>
       </div>
 
@@ -368,49 +412,46 @@ export default function Dashboard() {
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={yearlyProjections}
+                  data={projectionData}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="year"
-                    label={{ value: 'Years', position: 'insideBottomRight', offset: -5 }}
-                  />
+                  <XAxis dataKey="period" />
                   <YAxis
                     tickFormatter={(value) => {
                       if (value >= 1000000000) {
-                        return `€${(value / 1000000000).toFixed(1)}B`
+                        return `€${(value / 1000000000).toFixed(1)}B`;
                       }
                       if (value >= 1000000) {
-                        return `€${(value / 1000000).toFixed(1)}M`
+                        return `€${(value / 1000000).toFixed(1)}M`;
                       }
                       if (value >= 1000) {
-                        return `€${(value / 1000).toFixed(1)}K`
+                        return `€${(value / 1000).toFixed(1)}K`;
                       }
-                      return `€${value}`
+                      return `€${value}`;
                     }}
                   />
                   <Tooltip
                     formatter={(value: number) => [
                       `€${value.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
+                        maximumFractionDigits: 2,
                       })}`,
-                      ''
+                      '',
                     ]}
                   />
                   <Legend />
                   <Line
                     type="monotone"
-                    dataKey="cumulativeSavings"
-                    name="Projected Total Savings"
+                    dataKey="projectedSavings"
+                    name="Projected Savings (No ROI)"
                     stroke="#10B981"
                     strokeWidth={2}
                   />
                   <Line
                     type="monotone"
-                    dataKey="totalAssets"
-                    name="Projected Total Assets"
+                    dataKey="projectedNetWorth"
+                    name="Projected Net Worth (With ROI)"
                     stroke="#3B82F6"
                     strokeWidth={2}
                   />
@@ -429,17 +470,24 @@ export default function Dashboard() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                    {projections.map((projection) => (
-                      <th key={projection.period} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{projection.period}</th>
+                    {projectionData.map((proj) => (
+                      <th key={proj.period} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{proj.period}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {/* Projected Total Savings Row */}
+                  {/* Projected Savings Row */}
                   <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Projected Total Savings</td>
-                    {projections.map((projection) => (
-                      <td key={`savings-${projection.period}`} className="px-6 py-4 whitespace-nowrap text-sm text-green-600">€{projection.totalSavings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Projected Savings (No ROI)</td>
+                    {projectionData.map((proj) => (
+                      <td key={`savings-${proj.period}`} className="px-6 py-4 whitespace-nowrap text-sm text-green-600">{formatCurrency(proj.projectedSavings)}</td>
+                    ))}
+                  </tr>
+                  {/* Projected Net Worth Row */}
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Projected Net Worth (With ROI)</td>
+                    {projectionData.map((proj) => (
+                      <td key={`networth-${proj.period}`} className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">{formatCurrency(proj.projectedNetWorth)}</td>
                     ))}
                   </tr>
                   {/* Projected Total Income Row */}
@@ -454,13 +502,6 @@ export default function Dashboard() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Projected Total Expense</td>
                     {projections.map((projection) => (
                       <td key={`expense-${projection.period}`} className="px-6 py-4 whitespace-nowrap text-sm text-red-600">€{projection.totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    ))}
-                  </tr>
-                  {/* Projected Assets Row */}
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Projected Assets</td>
-                    {projections.map((projection) => (
-                      <td key={`assets-${projection.period}`} className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">€{projection.projectedAssets.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     ))}
                   </tr>
                 </tbody>
