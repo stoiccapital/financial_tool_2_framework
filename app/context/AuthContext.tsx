@@ -33,8 +33,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   useEffect(() => {
+    console.log('AuthProvider mounted')
+    
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('Session check:', { session, error })
+      if (error) {
+        console.error('Session error:', error)
+        setLoading(false)
+        return
+      }
+      
       if (session?.user) {
         setUser({
           id: session.user.id,
@@ -46,7 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     // Listen for changes on auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', { event, session })
       if (session?.user) {
         setUser({
           id: session.user.id,
@@ -59,13 +69,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      console.log('AuthProvider unmounting')
+      subscription.unsubscribe()
+    }
   }, [supabase.auth])
 
   const signInWithGoogle = async () => {
     try {
       const redirectTo = `${window.location.origin}/auth/callback`
-      console.log('Redirecting to:', redirectTo) // Debug log
+      console.log('Google sign in - redirecting to:', redirectTo)
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -83,7 +96,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data?.url) {
+        console.log('Redirecting to Google auth URL:', data.url)
         window.location.href = data.url
+      } else {
+        console.error('No redirect URL received from Google auth')
+        throw new Error('No redirect URL received')
       }
     } catch (error: any) {
       console.error('Error signing in with Google:', error)
