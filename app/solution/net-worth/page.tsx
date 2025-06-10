@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { formatCurrency } from '@/app/lib/utils';
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 // Types
 interface AssetItem {
@@ -51,12 +51,12 @@ const LIABILITY_CATEGORIES = [
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-export default function NetWorthPage() {
+const NetWorthPage: React.FC = () => {
   const [entries, setEntries] = useState<NetWorthEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState<NetWorthEntry | null>(null);
   const [inputMode, setInputMode] = useState<'total' | 'breakdown'>('total');
@@ -574,4 +574,6 @@ export default function NetWorthPage() {
       </div>
     </div>
   );
-} 
+}
+
+export default NetWorthPage; 

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
+import { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 export default function SolutionLayout({
   children,
@@ -46,6 +47,17 @@ export default function SolutionLayout({
     }
 
     checkAuth()
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      if (event === 'SIGNED_OUT') {
+        router.push('/auth/login')
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [router, supabase.auth])
 
   const navItems = [
