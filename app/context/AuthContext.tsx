@@ -27,6 +27,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  useEffect(() => {
+    console.log('Environment check:', {
+      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      isProduction: process.env.NODE_ENV === 'production'
+    })
+  }, [])
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
