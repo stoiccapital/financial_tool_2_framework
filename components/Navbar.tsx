@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/app/context/AuthContext'
 
-export default function Navbar() {
+function NavbarContent() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
@@ -184,5 +184,13 @@ export default function Navbar() {
         </div>
       </div>
     </nav>
+  )
+}
+
+export default function Navbar() {
+  return (
+    <Suspense fallback={<div className="h-16 bg-white shadow-lg"></div>}>
+      <NavbarContent />
+    </Suspense>
   )
 } 

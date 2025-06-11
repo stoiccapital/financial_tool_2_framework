@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 
@@ -20,11 +20,16 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Create a client component for handling search params
+function SearchParamsHandler({ children }: { children: React.ReactNode }) {
+  const searchParams = useSearchParams()
+  return <>{children}</>
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
     console.log('Environment check:', {
@@ -86,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.push(searchParams.get('redirectedFrom') || '/solution/dashboard')
+      router.push('/solution/dashboard')
     } catch (error: any) {
       console.error('Error signing in with email:', error)
       throw new Error(error.message || 'Failed to sign in with email')
@@ -129,7 +134,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUpWithEmail,
       signOut
     }}>
-      {children}
+      <Suspense fallback={<div>Loading...</div>}>
+        <SearchParamsHandler>
+          {children}
+        </SearchParamsHandler>
+      </Suspense>
     </AuthContext.Provider>
   )
 }

@@ -27,6 +27,17 @@ const nextConfig = {
       },
     ];
   },
+  // Only use static export for Netlify
+  ...(process.env.DEPLOY_PLATFORM === 'netlify' ? {
+    output: 'export',
+    images: {
+      unoptimized: true,
+    },
+  } : {}),
+  // Enable server actions for both platforms
+  experimental: {
+    serverActions: true,
+  },
 }
 
 module.exports = nextConfig 

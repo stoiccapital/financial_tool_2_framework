@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
-export default function SolutionLayout({
+function SolutionLayoutContent({
   children,
 }: {
   children: React.ReactNode
@@ -128,5 +128,26 @@ export default function SolutionLayout({
         />
       )}
     </div>
+  )
+}
+
+export default function SolutionLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <SolutionLayoutContent>
+        {children}
+      </SolutionLayoutContent>
+    </Suspense>
   )
 } 
