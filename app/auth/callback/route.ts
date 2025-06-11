@@ -2,6 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+// Force dynamic rendering of this route
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     const requestUrl = new URL(request.url)

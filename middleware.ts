@@ -1,6 +1,9 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Force dynamic rendering of middleware
+export const dynamic = 'force-dynamic'
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
